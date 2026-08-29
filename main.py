@@ -6,11 +6,11 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ==================== البيانات الخاصة بك مدمجة جاهزة ====================
+# ==================== البيانات الخاصة بك ====================
 BOT_TOKEN = "8556834336:AAG8dBUKD4R8O_U4GCNeZYqJRaLKsu40nys"
 CHANNEL_USERNAME = "@momomimoo"
 ADMIN_ID = 7360406910
-# =======================================================================
+# ==========================================================
 
 DATA_FILE = "participants.json"
 
@@ -24,8 +24,11 @@ def load_participants():
     return {}
 
 def save_participants(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"خطأ في حفظ البيانات: {e}")
 
 async def is_user_subscribed(bot, user_id):
     try:
@@ -39,11 +42,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     
-    # التحقق من الاشتراك في القناة
     subscribed = await is_user_subscribed(context.bot, user_id)
     
     if subscribed:
-        # حفظ المشارك
         participants = load_participants()
         participants[str(user_id)] = {
             "name": user.full_name,
@@ -51,13 +52,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_participants(participants)
         
-        await update.message.reply_text(
-            f"مرحباً بك {user.first_name}! 👋\n\n"
-            "✅ أنت مشترك في القناة وتم تسجيلك بنجاح في السحب! 🎯\n"
-            "حظاً موفقاً للجميع!"
-        )
+        msg = f"مرحباً بك {user.first_name}! 👋\n\n✅ أنت مشترك في القناة وتم تسجيلك بنجاح في السحب! 🎯\nحظاً موفقاً للجميع!"
+        await update.message.reply_text(msg)
     else:
-        # إرسال رابط القناة وزر التحقق
         clean_channel = CHANNEL_USERNAME.replace("@", "")
         keyboard = [
             [InlineKeyboardButton("📢 رابط القناة", url=f"https://t.me/{clean_channel}")],
@@ -65,14 +62,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
+        msg = (
             f"مرحباً بك {user.first_name}! 👋\n\n"
             f"عذراً، يجب عليك الاشتراك في قناتنا أولاً للمشاركة في السحب:\n"
             f"👉 {CHANNEL_USERNAME}\n\n"
-            "اشترك في القناة ثم اضغط على زر **'تحقق من الاشتراك'** بالأسفل 👇",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            f"اشترك في القناة ثم اضغط على زر 'تحقق من الاشتراك' بالأسفل 👇"
         )
+        await update.message.reply_text(msg, reply_markup=reply_markup)
 
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -90,11 +86,8 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
         save_participants(participants)
         
         await query.answer("✅ تم التحقق بنجاح!")
-        await query.edit_message_text(
-            f"شكراً لاشتراكك يا {user.first_name}! ❤️\n\n"
-            "🎉 تم تسجيلك بنجاح في السحب! 🎯\n"
-            "انتظر إعلان الفائز."
-        )
+        msg = f"شكراً لاشتراكك يا {user.first_name}! ❤️\n\n🎉 تم تسجيلك بنجاح في السحب! 🎯\nانتظر إعلان الفائز."
+        await query.edit_message_text(msg)
     else:
         await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
 
@@ -117,14 +110,14 @@ async def pick_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     winner_username = winner_info.get("username", "بدون يوزر")
     username_text = f"(@{winner_username})" if winner_username != "بدون يوزر" else ""
 
-    await update.message.reply_text(
-        "🎉 **الفائز في السحب العشوائي:** 🎉\n\n"
-        f"👤 **الاسم:** {winner_name}\n"
-        f"🆔 **اليوزر:** {username_text}\n"
-        f"🔢 **الآيدي:** `{winner_id}`\n\n"
-        "ألف مبروك للفائز! 🥳",
-        parse_mode="Markdown"
+    msg = (
+        f"🎉 الفائز في السحب العشوائي: 🎉\n\n"
+        f"👤 الاسم: {winner_name}\n"
+        f"🆔 اليوزر: {username_text}\n"
+        f"🔢 الآيدي: {winner_id}\n\n"
+        f"ألف مبروك للفائز! 🥳"
     )
+    await update.message.reply_text(msg)
 
 # --- سيرفر Flask لضمان استمرار عمل Render ---
 app = Flask(__name__)
