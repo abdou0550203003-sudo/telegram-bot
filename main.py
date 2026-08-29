@@ -6,10 +6,10 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ==================== الإعدادات (عدّلها بما يناسبك) ====================
-BOT_TOKEN = "ضع_توكن_البوت_هنا"   # توكن البوت من BotFather
-CHANNEL_USERNAME = "@momomimoo"    # معرف قناتك (يجب أن يكون البوت مشرفاً فيها)
-ADMIN_ID = 123456789              # الآيدي الخاص بك في تليجرام (ليمكنك استخدام أمر القرعة)
+# ==================== البيانات الخاصة بك مدمجة جاهزة ====================
+BOT_TOKEN = "8556834336:AAG8dBUKD4R8O_U4GCNeZYqJRaLKsu40nys"
+CHANNEL_USERNAME = "@momomimoo"
+ADMIN_ID = 7360406910
 # =======================================================================
 
 DATA_FILE = "participants.json"
@@ -101,7 +101,6 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 async def pick_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # التحقق من أن منفذ الأمر هو الأدمن
     if ADMIN_ID and user_id != ADMIN_ID:
         await update.message.reply_text("⛔ هذا الأمر مخصص لمدير البوت فقط!")
         return
@@ -112,7 +111,6 @@ async def pick_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يوجد أي مشاركين مسجلين في السحب حتى الآن!")
         return
 
-    # اختيار فائز عشوائي
     winner_id, winner_info = random.choice(list(participants.items()))
     
     winner_name = winner_info.get("name", "غير معروف")
@@ -140,10 +138,8 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 def main():
-    # تشغيل سيرفر Flask في الخلفية
     threading.Thread(target=run_flask, daemon=True).start()
 
-    # تشغيل بوت تليجرام
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
