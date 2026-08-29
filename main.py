@@ -1,91 +1,158 @@
 import os
+import json
 import random
-from threading import Thread
+import threading
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# --- خادم ويب خفيف لإبقاء Render شغالاً 24/7 ---
-web_app = Flask(__name__)
+# ==================== الإعدادات (عدّلها بما يناسبك) ====================
+BOT_TOKEN = "ضع_توكن_البوت_هنا"   # توكن البوت من BotFather
+CHANNEL_USERNAME = "@momomimoo"    # معرف قناتك (يجب أن يكون البوت مشرفاً فيها)
+ADMIN_ID = 123456789              # الآيدي الخاص بك في تليجرام (ليمكنك استخدام أمر القرعة)
+# =======================================================================
 
-@web_app.route('/')
-def home():
-    return "Bot is active and running 24/7!"
+DATA_FILE = "participants.json"
 
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    web_app.run(host='0.0.0.0', port=port)
+def load_participants():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
 
-# --- البيانات الخاصة بك مدمجة ---
-BOT_TOKEN = "8556834336:AAG8dBUKD4R8O_U4GCNeZYqJRaLKsu40nys"
-CHANNEL_USERNAME = "@momomimoo"
-ADMIN_ID = 7360406910
+def save_participants(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-participants = set()
+async def is_user_subscribed(bot, user_id):
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        return member.status in ['creator', 'administrator', 'member']
+    except Exception as e:
+        print(f"خطأ في التحقق من الاشتراك: {e}")
+        return False
 
-async def start_competition(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_id = user.id
+    
+    # التحقق من الاشتراك في القناة
+    subscribed = await is_user_subscribed(context.bot, user_id)
+    
+    if subscribed:
+        # حفظ المشارك
+        participants = load_participants()
+        participants[str(user_id)] = {
+            "name": user.full_name,
+            "username": user.username or "بدون يوزر"
+        }
+        save_participants(participants)
+        
+        await update.message.reply_text(
+            f"مرحباً بك {user.first_name}! 👋\n\n"
+            "✅ أنت مشترك في القناة وتم تسجيلك بنجاح في السحب! 🎯\n"
+            "حظاً موفقاً للجميع!"
+        )
+    else:
+        # إرسال رابط القناة وزر التحقق
+        clean_channel = CHANNEL_USERNAME.replace("@", "")
+        keyboard = [
+            [InlineKeyboardButton("📢 رابط القناة", url=f"https://t.me/{clean_channel}")],
+            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_sub")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"مرحباً بك {user.first_name}! 👋\n\n"
+            f"عذراً، يجب عليك الاشتراك في قناتنا أولاً للمشاركة في السحب:\n"
+            f"👉 {CHANNEL_USERNAME}\n\n"
+            "اشترك في القناة ثم اضغط على زر **'تحقق من الاشتراك'** بالأسفل 👇",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+
+async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user
+    user_id = user.id
+    
+    subscribed = await is_user_subscribed(context.bot, user_id)
+    
+    if subscribed:
+        participants = load_participants()
+        participants[str(user_id)] = {
+            "name": user.full_name,
+            "username": user.username or "بدون يوزر"
+        }
+        save_participants(participants)
+        
+        await query.answer("✅ تم التحقق بنجاح!")
+        await query.edit_message_text(
+            f"شكراً لاشتراكك يا {user.first_name}! ❤️\n\n"
+            "🎉 تم تسجيلك بنجاح في السحب! 🎯\n"
+            "انتظر إعلان الفائز."
+        )
+    else:
+        await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
+
+async def pick_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # التحقق من أن منفذ الأمر هو الأدمن
+    if ADMIN_ID and user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ هذا الأمر مخصص لمدير البوت فقط!")
         return
-    keyboard = [[InlineKeyboardButton("🎯 المشاركة في المسابقة", callback_data="join")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    participants = load_participants()
+    
+    if not participants:
+        await update.message.reply_text("❌ لا يوجد أي مشاركين مسجلين في السحب حتى الآن!")
+        return
+
+    # اختيار فائز عشوائي
+    winner_id, winner_info = random.choice(list(participants.items()))
+    
+    winner_name = winner_info.get("name", "غير معروف")
+    winner_username = winner_info.get("username", "بدون يوزر")
+    username_text = f"(@{winner_username})" if winner_username != "بدون يوزر" else ""
+
     await update.message.reply_text(
-        "🎉 **مسابقة جديدة!**\n\nاضغط على الزر أدناه للمشاركة (بشرط الاشتراك في القناة أولاً).",
-        reply_markup=reply_markup,
+        "🎉 **الفائز في السحب العشوائي:** 🎉\n\n"
+        f"👤 **الاسم:** {winner_name}\n"
+        f"🆔 **اليوزر:** {username_text}\n"
+        f"🔢 **الآيدي:** `{winner_id}`\n\n"
+        "ألف مبروك للفائز! 🥳",
         parse_mode="Markdown"
     )
 
-async def join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        if member.status in ['left', 'kicked']:
-            await query.answer("❌ يجب عليك الاشتراك في القناة أولاً للمشاركة!", show_alert=True)
-            return
-    except Exception:
-        await query.answer("⚠️ حدث خطأ! تأكد أن البوت مضاف كـ (مشرف / Admin) في القناة.", show_alert=True)
-        return
+# --- سيرفر Flask لضمان استمرار عمل Render ---
+app = Flask(__name__)
 
-    if user_id in participants:
-        await query.answer("⚠️ أنت مسجل بالفعل في هذه المسابقة!", show_alert=True)
-    else:
-        participants.add(user_id)
-        await query.answer(f"✅ تم قبول مشاركتك بنجاح! عدد المشاركين الحالي: {len(participants)}", show_alert=True)
+@app.route('/')
+def home():
+    return "Bot is running live 24/7!"
 
-async def pick_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not participants:
-        await update.message.reply_text("❌ لا يوجد أي مشاركين في المسابقة بعد.")
-        return
-    
-    winner_id = random.choice(list(participants))
-    try:
-        winner = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=winner_id)
-        winner_name = winner.user.first_name
-        await update.message.reply_text(
-            f"🏆 **مبارك للفائز!**\n\n"
-            f"الفائز في المسابقة هو: [{winner_name}](tg://user?id={winner_id})\n"
-            f"إجمالي عدد المشاركين: {len(participants)}",
-            parse_mode="Markdown"
-        )
-    except Exception:
-        await update.message.reply_text(f"🏆 الفائز هو صاحب الآيدي: {winner_id}")
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
 def main():
-    # تشغيل سيرفر الويب في الخلفية
-    Thread(target=run_web, daemon=True).start()
-    
-    # تشغيل البوت
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("create", start_competition))
-    app.add_handler(CommandHandler("winner", pick_winner))
-    app.add_handler(CallbackQueryHandler(join_callback, pattern="^join$"))
-    
-    print("✅ البوت يعمل الآن بنجاح...")
-    app.run_polling()
+    # تشغيل سيرفر Flask في الخلفية
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    # تشغيل بوت تليجرام
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("winner", pick_winner))
+    application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
+
+    print("البوت يعمل الآن...")
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
-  
+    
