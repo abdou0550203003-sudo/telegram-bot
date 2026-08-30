@@ -1,5 +1,3 @@
-
-    
 import os
 import json
 import threading
@@ -49,7 +47,6 @@ async def is_user_subscribed(bot, user_id):
         print(f"خطأ في التحقق من الاشتراك: {e}")
         return False
 
-# تحديث زر القناة مباشرة بعد زيادة الأصوات
 async def update_channel_post(bot, contestant_id, contestant_data):
     msg_id = contestant_data.get("message_id")
     if not msg_id:
@@ -182,7 +179,7 @@ async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, conte
         await update.message.reply_text("❌ المتسابق غير موجود أو انتهت المسابقة!")
         return
 
-    # استثناء للأدمن: يسمح له بالتصويت بلا حدود دون اشتراك إجباري
+    # الأدمن يمكنه التصويت بلا قيود
     if is_admin(user_id):
         await apply_vote(update, context, contestant_id, user, is_callback=False, skip_limits=True)
         return
@@ -216,14 +213,16 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     if not target_contestant:
         return
 
-    voter_display_name = f"[{user.first_name}](tg://user?id={user_id})"
+    # استخراج اليوزر إن وجد لتسهيل الدخول لحسابه
+    username = user.username if user.username else None
+    
     voter_entry = {
         "id": user_id,
         "name": user.first_name,
-        "markdown_name": voter_display_name
+        "username": f"@{username}" if username else None
     }
 
-    # إذا كان المستخدم أدمن، نزيد صوته مباشرة دون مسح أصوات سابقة أو قيود
+    # إذا كان المستخدم أدمن، نزيد صوته مباشرة دون مسح أصوات
     if skip_limits:
         target_contestant["voters"].append(voter_entry)
         target_contestant["votes"] += 1
@@ -236,37 +235,25 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
             await update.message.reply_text(msg, parse_mode="Markdown")
         return
 
-    # للمستخدمين العاديين: البحث عن أي تصويت سابق لهذا المستخدم في أي متسابق وسحبه
-    old_contestant_key = None
+    # لكل مستخدم صوت واحد فقط في المسابقة كلها:
+    # نقوم بالبحث في جميع المتسابقين وحذف أي صوت سابق لهذا المستخدم تماماً
     for c_id, c_data in data["contestants"].items():
-        for v in c_data.get("voters", []):
-            if isinstance(v, dict) and v.get("id") == user_id:
-                old_contestant_key = c_id
-                break
-            elif str(v) == str(user_id):
-                old_contestant_key = c_id
-                break
-        if old_contestant_key:
-            break
+        original_voters_count = len(c_data["voters"])
+        # تصفية المصوتين بحيث يتم إزالة هذا المستخدم من أي متسابق آخر أو حتى نفس المتسابق
+        c_data["voters"] = [v for v in c_data["voters"] if v.get("id") != user_id]
+        
+        # إذا تغير عدد المصوتين في ذلك المتسابق، يعني أننا حذفنا صوته القديم منه، فنقوم بتحديث عداد أصواته
+        if len(c_data["voters"]) < original_voters_count:
+            c_data["votes"] = max(0, c_data["votes"] - 1)
+            # تحديث منشور ذلك المتسابق القديم في القناة
+            await update_channel_post(context.bot, c_id, c_data)
 
-    # إذا كان قد صوت لنفس المتسابق الحالي مسبقاً، نسمح له بسحب صوته أو إخباره (حسب رغبتك: هنا نسمح له بالإعادة ونسحب ثم نضيفه مجدداً ليتم تحديثه)
-    if old_contestant_key and old_contestant_key == contestant_id:
-        # إزالة من نفس المتسابق وإعادة إضافته (أو رسالة تم التصويت مسبقاً)
-        # بناءً على طلبك: "ايذا حاولت ان اعيد تصويتي للمتسابق الاول البوت لا يسمح لي واريده ان يسمح بذالك وكالعادة يسحب التصويت من المتسابق الثاني"
-        pass
-
-    # إذا كان صوت لمتسابق آخر سابقاً (أو نفس المتسابق)، نسحب صوته من ذلك المتسابق القديم أياً كان
-    if old_contestant_key:
-        old_contestant = data["contestants"][old_contestant_key]
-        old_contestant["voters"] = [v for v in old_contestant["voters"] if (v.get("id") if isinstance(v, dict) else str(v)) != str(user_id)]
-        old_contestant["votes"] = max(0, old_contestant["votes"] - 1)
-        await update_channel_post(context.bot, old_contestant_key, old_contestant)
-
-    # إضافة الصوت للمتسابق الجديد
+    # إضافة الصوت للمتسابق الجديد المطلوب
     target_contestant["voters"].append(voter_entry)
     target_contestant["votes"] += 1
     save_data(data)
     
+    # تحديث منشور المتسابق الجديد في القناة
     await update_channel_post(context.bot, contestant_id, target_contestant)
 
     msg = f'تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق "{target_contestant["name"]}"'
@@ -296,7 +283,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
 
-# عرض المصوتين مع تصحيح الرابط ليفتح الحساب بضغطة زر
+# عرض المصوتين مع إرسال اليوزر المباشر أو رابط الحساب ليطابق طلبك تماماً
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -320,20 +307,22 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         formatted_voters = []
         for v in voters:
-            if isinstance(v, dict):
-                v_id = v.get("id")
-                v_name = v.get("name")
-                # تصحيح صيغة الـ Markdown لضمان عمل الاسم الأزرق القابل للنقر بشكل صحيح
-                name_md = f"[{v_name}](tg://user?id={v_id})"
-                formatted_voters.append(f"• {name_md}")
+            v_name = v.get("name", "مستخدم")
+            v_username = v.get("username")
+            v_id = v.get("id")
+            
+            # إذا كان لديه يوزر، نعرضه مع رابط مباشر أو يوزر قابل للضغط، وإذا لم يكن لديه نعرض رابط تليجرام بالآيدي أو اسمه مع الآيدي
+            if v_username:
+                formatted_voters.append(f"• {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• [مستخدم](tg://user?id={v})")
+                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: `{v_id}`]")
+                
         voters_str = "\n".join(formatted_voters)
     
     await update.message.reply_text(
         f"📊 **المصوتين للمتسابق ({contestant['name']}):**\n"
         f"إجمالي الأصوات: {contestant['votes']}\n\n"
-        f"اضغط على الاسم للانتقال لحسابه مباشرة:\n{voters_str}",
+        f"قائمة حسابات المصوتين:\n{voters_str}",
         parse_mode="Markdown"
     )
 
@@ -366,7 +355,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
 # --- سيرفر Flask لضمان استمرار عمل Render ---
-app = Flask(__name__)
+app = FlaskName = Flask(__name__)
 
 @app.route('/')
 def home():
@@ -389,8 +378,9 @@ def main():
     application.add_handler(CommandHandler("addadmin", add_admin))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بكل التحديثات والإصلاحات...")
+    print("البوت يعمل الآن بالتعديلات النهائية الدقيقة...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
+                         
