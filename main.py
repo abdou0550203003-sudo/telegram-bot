@@ -1,3 +1,5 @@
+
+    
 import os
 import json
 import threading
@@ -19,7 +21,6 @@ def load_data():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # التأكد من وجود الحقول الأساسية
                 if "admins" not in data:
                     data["admins"] = [MASTER_ADMIN_ID]
                 if "contestants" not in data:
@@ -72,7 +73,6 @@ async def update_channel_post(bot, contestant_id, contestant_data):
 
 # ==================== الأوامر الإدارية ====================
 
-# 1. أمر إنهاء المسابقة الحالية وبدء مسابقة جديدة (تصفير الكل)
 async def new_contest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -84,7 +84,6 @@ async def new_contest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     await update.message.reply_text("🔄 تم إنهاء المسابقة السابقة وحذف جميع المتسابقين والأصوات بنجاح! البوت جاهز لمسابقة جديدة.")
 
-# 6. أمر إضافة أدمن جديد للبوت
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != MASTER_ADMIN_ID:
@@ -109,7 +108,6 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
-# 3. أمر إضافة متسابق (يقبل اسم عادي أو يوزر مثل @lrdlocas)
 async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -122,11 +120,9 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     raw_input = " ".join(context.args)
     
-    # إذا كان المدخل يبدأ بـ @ (يوزر تليجرام)
     if raw_input.startswith("@"):
         username = raw_input
-        display_name = username  # سيظهر كـ @username في القناة
-        # ملاحظة: في تليجرام يوزر الـ @ قابل للنقر أوتوماتيكياً
+        display_name = username
         contestant_text = f"👤 المتسابق: {username}"
     else:
         display_name = raw_input
@@ -151,7 +147,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["contestants"][contestant_id] = {
             "name": display_name,
             "votes": 0,
-            "voters": [],  # يحوي تفاصيل المصوتين
+            "voters": [],
             "message_id": msg.message_id
         }
         save_data(data)
@@ -186,6 +182,11 @@ async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, conte
         await update.message.reply_text("❌ المتسابق غير موجود أو انتهت المسابقة!")
         return
 
+    # استثناء للأدمن: يسمح له بالتصويت بلا حدود دون اشتراك إجباري
+    if is_admin(user_id):
+        await apply_vote(update, context, contestant_id, user, is_callback=False, skip_limits=True)
+        return
+
     subscribed = await is_user_subscribed(context.bot, user_id)
     
     if not subscribed:
@@ -205,9 +206,9 @@ async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, conte
         await update.message.reply_text(msg, reply_markup=reply_markup)
         return
 
-    await apply_vote(update, context, contestant_id, user)
+    await apply_vote(update, context, contestant_id, user, is_callback=False, skip_limits=False)
 
-async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contestant_id: str, user, is_callback=False):
+async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contestant_id: str, user, is_callback=False, skip_limits=False):
     user_id = user.id
     data = load_data()
     target_contestant = data["contestants"].get(contestant_id)
@@ -215,7 +216,6 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     if not target_contestant:
         return
 
-    # تجهيز بيانات المصوت (اسم أزرق قابل للنقر بناءً على توفر يوزره أو اسمه)
     voter_display_name = f"[{user.first_name}](tg://user?id={user_id})"
     voter_entry = {
         "id": user_id,
@@ -223,35 +223,43 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
         "markdown_name": voter_display_name
     }
 
-    # 5. منع نفس الشخص من التصويت لشخصين في نفس المسابقة (سحب الصوت القديم وإضافته للجديد)
+    # إذا كان المستخدم أدمن، نزيد صوته مباشرة دون مسح أصوات سابقة أو قيود
+    if skip_limits:
+        target_contestant["voters"].append(voter_entry)
+        target_contestant["votes"] += 1
+        save_data(data)
+        await update_channel_post(context.bot, contestant_id, target_contestant)
+        msg = f'⚡ [أدمن] تم احتساب صوتك بنجاح للمتسابق "{target_contestant["name"]}"!'
+        if is_callback:
+            await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
+        else:
+            await update.message.reply_text(msg, parse_mode="Markdown")
+        return
+
+    # للمستخدمين العاديين: البحث عن أي تصويت سابق لهذا المستخدم في أي متسابق وسحبه
     old_contestant_key = None
     for c_id, c_data in data["contestants"].items():
         for v in c_data.get("voters", []):
             if isinstance(v, dict) and v.get("id") == user_id:
                 old_contestant_key = c_id
                 break
-            elif v == user_id or str(v) == str(user_id):
+            elif str(v) == str(user_id):
                 old_contestant_key = c_id
                 break
         if old_contestant_key:
             break
 
-    # إذا كان صوت مسبقاً لنفس المتسابق الحالي تماماً
-    if old_contestant_key == contestant_id:
-        msg = f'يا "{user.first_name}"٬ عذرا لا يمكنك ان تصوت مرة اخرى'
-        if is_callback:
-            await update.callback_query.edit_message_text(msg)
-        else:
-            await update.message.reply_text(msg)
-        return
+    # إذا كان قد صوت لنفس المتسابق الحالي مسبقاً، نسمح له بسحب صوته أو إخباره (حسب رغبتك: هنا نسمح له بالإعادة ونسحب ثم نضيفه مجدداً ليتم تحديثه)
+    if old_contestant_key and old_contestant_key == contestant_id:
+        # إزالة من نفس المتسابق وإعادة إضافته (أو رسالة تم التصويت مسبقاً)
+        # بناءً على طلبك: "ايذا حاولت ان اعيد تصويتي للمتسابق الاول البوت لا يسمح لي واريده ان يسمح بذالك وكالعادة يسحب التصويت من المتسابق الثاني"
+        pass
 
-    # إذا كان قد صوت لشخص آخر سابقاً، نقوم بسحب صوته منه أولاً
-    if old_contestant_key and old_contestant_key != contestant_id:
+    # إذا كان صوت لمتسابق آخر سابقاً (أو نفس المتسابق)، نسحب صوته من ذلك المتسابق القديم أياً كان
+    if old_contestant_key:
         old_contestant = data["contestants"][old_contestant_key]
-        # حذف المصوت من قائمة القديم وتقليل صوته 1
         old_contestant["voters"] = [v for v in old_contestant["voters"] if (v.get("id") if isinstance(v, dict) else str(v)) != str(user_id)]
         old_contestant["votes"] = max(0, old_contestant["votes"] - 1)
-        # تحديث منشور المتسابق القديم في القناة
         await update_channel_post(context.bot, old_contestant_key, old_contestant)
 
     # إضافة الصوت للمتسابق الجديد
@@ -259,10 +267,8 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     target_contestant["votes"] += 1
     save_data(data)
     
-    # تحديث منشور المتسابق الجديد في القناة
     await update_channel_post(context.bot, contestant_id, target_contestant)
 
-    # 4. النصوص المطلوبة بالحرف
     msg = f'تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق "{target_contestant["name"]}"'
     
     if is_callback:
@@ -276,15 +282,21 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     user_id = user.id
     
     contestant_id = query.data.replace("check_vote_", "")
+    
+    if is_admin(user_id):
+        await query.answer("✅ تم التحقق!")
+        await apply_vote(update, context, contestant_id, user, is_callback=True, skip_limits=True)
+        return
+
     subscribed = await is_user_subscribed(context.bot, user_id)
     
     if subscribed:
         await query.answer("✅ تم التحقق بنجاح!")
-        await apply_vote(update, context, contestant_id, user, is_callback=True)
+        await apply_vote(update, context, contestant_id, user, is_callback=True, skip_limits=False)
     else:
         await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
 
-# 2. أمر عرض المصوتين بأسماء زرقاء قابلة للنقر (الأدمن فقط)
+# عرض المصوتين مع تصحيح الرابط ليفتح الحساب بضغطة زر
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -309,8 +321,10 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_voters = []
         for v in voters:
             if isinstance(v, dict):
-                # عرض الاسم الأزرق القابل للنقر الذي يفتح البروفايل مباشرة عند الضغط عليه
-                name_md = v.get("markdown_name", f"[{v.get('name', 'مستخدم')}](tg://user?id={v.get('id')})")
+                v_id = v.get("id")
+                v_name = v.get("name")
+                # تصحيح صيغة الـ Markdown لضمان عمل الاسم الأزرق القابل للنقر بشكل صحيح
+                name_md = f"[{v_name}](tg://user?id={v_id})"
                 formatted_voters.append(f"• {name_md}")
             else:
                 formatted_voters.append(f"• [مستخدم](tg://user?id={v})")
@@ -323,7 +337,6 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# أمر تحديد الأصوات يدويًا (الأدمن فقط)
 async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -368,7 +381,6 @@ def main():
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # الأوامر الشاملة (القديمة والجديدة)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("add", add_contestant))
     application.add_handler(CommandHandler("voters", view_voters))
@@ -377,9 +389,8 @@ def main():
     application.add_handler(CommandHandler("addadmin", add_admin))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بكل التحديثات...")
+    print("البوت يعمل الآن بكل التحديثات والإصلاحات...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
-    
