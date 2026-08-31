@@ -2,13 +2,13 @@ import os
 import json
 import threading
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8916563533:AAGIJUuDHdx9cQuWbc4eq0-BJEclMaKiXeA"
+BOT_TOKEN = "ضع_التوكن_الجديد_هنا"
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
-MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك (المطور الرئيسي)
+MASTER_ADMIN_ID = 8209968506         # الآيدي الخاص بك
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
 # ==========================================================
 
@@ -79,16 +79,16 @@ async def new_contest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     data["contestants"] = {}
     save_data(data)
-    await update.message.reply_text("🔄 تم إنهاء المسابقة السابقة وحذف جميع المتسابقين والأصوات بنجاح! البوت جاهز لمسابقة جديدة.")
+    await update.message.reply_text("🔄 تم إنهاء المسابقة السابقة وحذف جميع المتسابقين والأصوات بنجاح!")
 
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != MASTER_ADMIN_ID:
-        await update.message.reply_text("⛔ هذا الأمر مخصص للمطور الأساسي للبوت فقط!")
+        await update.message.reply_text("⛔ هذا الأمر مخصص للمطور الأساسي فقط!")
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة آيدي الأدمن المراد إضافته.\nمثال: `/addadmin 123456789`", parse_mode="Markdown")
+        await update.message.reply_text("❌ اكتب آيدي الأدمن المراد إضافته.\nمثال: `/addadmin 123456789`", parse_mode="Markdown")
         return
 
     try:
@@ -101,7 +101,21 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if new_admin_id not in data["admins"]:
         data["admins"].append(new_admin_id)
         save_data(data)
-        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد للبوت بنجاح!", parse_mode="Markdown")
+        
+        # إضافة قائمة الأوامر الإدارية للأدمن الجديد تلقائياً
+        admin_commands = [
+            BotCommand("start", "بدء التشغيل"),
+            BotCommand("add", "إضافة متسابق جديد"),
+            BotCommand("voters", "عرض المصوتين"),
+            BotCommand("setvotes", "تعديل الأصوات"),
+            BotCommand("newcontest", "تصفير المسابقة")
+        ]
+        try:
+            await context.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=new_admin_id))
+        except Exception:
+            pass
+
+        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد وتفعيل قائمته الخاصة!", parse_mode="Markdown")
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
@@ -112,18 +126,12 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم المتسابق أو يوزره بعد الأمر.\nمثال:\n`/add يوسف`\n`/add @lrdlocas`", parse_mode="Markdown")
+        await update.message.reply_text("❌ اكتب اسم المتسابق بعد الأمر.\nمثال: `/add يوسف`", parse_mode="Markdown")
         return
 
     raw_input = " ".join(context.args)
-    
-    if raw_input.startswith("@"):
-        username = raw_input
-        display_name = username
-        contestant_text = f"👤 المتسابق: {username}"
-    else:
-        display_name = raw_input
-        contestant_text = f"👤 المتسابق: {display_name}"
+    display_name = raw_input
+    contestant_text = f"👤 المتسابق: {display_name}"
 
     data = load_data()
     contestant_id = str(len(data["contestants"]) + 1)
@@ -149,11 +157,11 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_data(data)
         
-        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) في القناة بنجاح!\nرقم المتسابق: `{contestant_id}`", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) بنجاح!\nرقم المتسابق: `{contestant_id}`", parse_mode="Markdown")
     except Exception as e:
-        await update.message.reply_text(f"❌ حدث خطأ أثناء النشر في القناة: {e}")
+        await update.message.reply_text(f"❌ حدث خطأ أثناء النشر: {e}")
 
-# ==================== نظام التصويت والمستخدمين ====================
+# ==================== نظام التصويت ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -164,7 +172,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        f"مرحباً بك {user.first_name} في بوت المسابقات والأسئلة! 🏆\n"
+        f"مرحباً بك {user.first_name} في بوت المسابقات! 🏆\n"
         "اضغط على زر التصويت الموجود أسفل متسابقك المفضل في القناة للمشاركة."
     )
 
@@ -179,7 +187,6 @@ async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, conte
         await update.message.reply_text("❌ المتسابق غير موجود أو انتهت المسابقة!")
         return
 
-    # الأدمن يمكنه التصويت بلا قيود
     if is_admin(user_id):
         await apply_vote(update, context, contestant_id, user, is_callback=False, skip_limits=True)
         return
@@ -233,7 +240,7 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
             await update.message.reply_text(msg, parse_mode="Markdown")
         return
 
-    # نقل الصوت: حذف التصويت السابق كلياً من أي متسابق آخر
+    # سحب الصوت القديم من أي متسابق آخر
     for c_id, c_data in data["contestants"].items():
         original_voters_count = len(c_data["voters"])
         c_data["voters"] = [v for v in c_data["voters"] if v.get("id") != user_id]
@@ -273,7 +280,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
         await query.answer("✅ تم التحقق بنجاح!")
         await apply_vote(update, context, contestant_id, user, is_callback=True, skip_limits=False)
     else:
-        await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
+        await query.answer("❌ لم تشترك في القناة بعد!", show_alert=True)
 
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -344,7 +351,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
-# --- سيرفر Flask لضمان استمرار عمل Render ---
+# --- سيرفر Flask ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -355,10 +362,32 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
+# إعداد القوائم المخصصة حسب الصلاحية عند إقلاع البوت
+async def setup_bot_commands(app):
+    # 1. قائمة المستخدمين العاديين
+    user_commands = [
+        BotCommand("start", "بدء تشغيل البوت والتصويت")
+    ]
+    await app.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+
+    # 2. قائمة الأدمن الرئيسي
+    admin_commands = [
+        BotCommand("start", "بدء تشغيل البوت"),
+        BotCommand("add", "إضافة متسابق جديد للقناة"),
+        BotCommand("voters", "عرض قائمة المصوتين لمتسابق"),
+        BotCommand("setvotes", "تعديل عدد أصوات متسابق"),
+        BotCommand("newcontest", "إنهاء المسابقة وتصفير الأصوات"),
+        BotCommand("addadmin", "إضافة أدمن جديد للبوت")
+    ]
+    try:
+        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=MASTER_ADMIN_ID))
+    except Exception as e:
+        print(f"تنبيه ضبط قائمة الأدمن: {e}")
+
 def main():
     threading.Thread(target=run_flask, daemon=True).start()
 
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application = ApplicationBuilder().token(BOT_TOKEN).post_init(setup_bot_commands).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("add", add_contestant))
@@ -368,7 +397,7 @@ def main():
     application.add_handler(CommandHandler("addadmin", add_admin))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بالتعديلات الأخيرة مع بياناتك الجديدة...")
+    print("البوت يعمل الآن بالقوائم المخصصة...")
     application.run_polling()
 
 if __name__ == "__main__":
