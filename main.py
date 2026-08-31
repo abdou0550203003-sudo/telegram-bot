@@ -81,7 +81,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_vote(update, context, contestant_id)
         return
 
-    # تصميم القائمة بالألوان والأيقونات التفاعلية
     keyboard = [
         [InlineKeyboardButton("💎 الخدمات المميزة 💎", callback_data="btn_services")],
         [InlineKeyboardButton("🏆 قائمة المتسابقين 👥", callback_data="btn_contestants")],
@@ -89,7 +88,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📊 الإحصائيات 📈", callback_data="btn_stats"), InlineKeyboardButton("ℹ️ الشروط والتعليمات ❓", callback_data="btn_help")]
     ]
     
-    # حصرية كشف المصوتين ولوحة الأدمن للحسابات الإدارية فقط
     if is_admin(user_id):
         keyboard.insert(3, [InlineKeyboardButton("🔍 كشف المصوتين (أدمن) 👤", callback_data="btn_voters_select")])
         keyboard.insert(4, [InlineKeyboardButton("⚙️ لوحة تحكم الأدمن 🛠️", callback_data="btn_admin")])
@@ -139,7 +137,6 @@ async def button_click_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(text, reply_markup=back_btn, parse_mode="Markdown")
 
     elif data_key == "btn_voters_select":
-        # حصرية للأدمن فقط
         if not is_admin(user_id):
             await query.answer("⛔ هذه الميزة خاصة بالأدمن فقط!", show_alert=True)
             return
@@ -149,13 +146,12 @@ async def button_click_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.edit_message_text("⚠️ لا يوجد متسابقين لعرض أصواتهم.", reply_markup=back_btn)
             return
 
-        # إنشاء أزرار تفاعلية بعدد المتسابقين بنفس الترتيب
         voters_keyboard = []
         row = []
         for c_id, info in c_data.items():
             btn_text = f"👤 {c_id}. {info['name']} ({info['votes']} صوت)"
             row.append(InlineKeyboardButton(btn_text, callback_data=f"show_voters_{c_id}"))
-            if len(row) == 2:  # كل زرين في سطر
+            if len(row) == 2:
                 voters_keyboard.append(row)
                 row = []
         if row:
@@ -483,7 +479,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
-# --- سيرفر Flask لاستمرار التشغيل ---
+# --- سيرفر Flask لاستمرار التشغيل وإبقاء البوت حياً على Render ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -491,5 +487,11 @@ def home():
     return "Bot is running live 24/7!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+async def setup_bot_commands(app_bot):
+    user_commands = [
+        BotCommand("start", "فتح القائمة الرئيسية")
+    ]
+    a
