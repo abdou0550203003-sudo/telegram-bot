@@ -6,9 +6,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8916563533:AAGIJUuDHdx9cQuWbc4eq0-BJEclMaKiXeA"
+BOT_TOKEN = "ضع_التوكن_الجديد_هنا"
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
-MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك (تم التحديث)
+MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
 # ==========================================================
 
@@ -282,13 +282,14 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد!", show_alert=True)
 
+# ===== الدالة المعدلة والآمنة لعرض قائمة المصوتين بدون أخطاء =====
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         return
         
     if not context.args:
-        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: `/voters 1`", parse_mode="Markdown")
+        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: /voters 1")
         return
         
     contestant_id = context.args[0]
@@ -305,28 +306,31 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         formatted_voters = []
         for idx, v in enumerate(voters, 1):
-            v_name = str(v.get("name", "مستخدم")).replace("*", "").replace("_", "").replace("`", "")
+            v_name = v.get("name") if v.get("name") else "مستخدم بدون اسم"
             v_username = v.get("username")
-            v_id = v.get("id")
+            v_id = v.get("id", "غير معروف")
             
             if v_username:
                 formatted_voters.append(f"• {idx}. {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• {idx}. {v_name} ⟵ [آيدي: `{v_id}`]")
+                formatted_voters.append(f"• {idx}. {v_name} ⟵ (بدون يوزر - ID: {v_id})")
                 
         voters_str = "\n".join(formatted_voters)
     
     full_msg = (
-        f"📊 **المصوتين للمتسابق ({contestant['name']}):**\n"
-        f"إجمالي الأصوات: {contestant['votes']}\n\n"
+        f"📊 المصوتين للمتسابق ({contestant.get('name', '')}):\n"
+        f"إجمالي الأصوات: {contestant.get('votes', 0)}\n\n"
         f"قائمة حسابات المصوتين:\n{voters_str}"
     )
 
-    if len(full_msg) > 4000:
-        for x in range(0, len(full_msg), 4000):
-            await update.message.reply_text(full_msg[x:x+4000], parse_mode="Markdown")
-    else:
-        await update.message.reply_text(full_msg, parse_mode="Markdown")
+    try:
+        if len(full_msg) > 4000:
+            for x in range(0, len(full_msg), 4000):
+                await update.message.reply_text(full_msg[x:x+4000])
+        else:
+            await update.message.reply_text(full_msg)
+    except Exception as e:
+        await update.message.reply_text(f"❌ حدث خطأ أثناء عرض القائمة: {e}")
 
 async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
