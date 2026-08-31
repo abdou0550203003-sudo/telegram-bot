@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 # ==================== الإعدادات الأساسية ====================
 BOT_TOKEN = "8916563533:AAGIJUuDHdx9cQuWbc4eq0-BJEclMaKiXeA"
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
-MASTER_ADMIN_ID = 8209968506         # الآيدي الخاص بك (المطور الرئيسي)
+MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك (المطور الرئيسي)
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
 # ==========================================================
 
