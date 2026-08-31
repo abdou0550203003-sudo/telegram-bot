@@ -120,6 +120,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
+# ===== دالة إضافة المتسابقين المعدلة لتشمل الرقم بالتتابع =====
 async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -132,10 +133,12 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     raw_input = " ".join(context.args)
     display_name = raw_input
-    contestant_text = f"👤 المتسابق: {display_name}"
 
     data = load_data()
     contestant_id = str(len(data["contestants"]) + 1)
+    
+    # تنسيق اسم المنشور بالنظام التسلسلي (مثال: 👤 المتسابق (1): علي)
+    contestant_text = f"👤 المتسابق ({contestant_id}): {display_name}"
     
     clean_bot = BOT_USERNAME.replace("@", "")
     vote_url = f"https://t.me/{clean_bot}?start=vote_{contestant_id}"
@@ -158,7 +161,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_data(data)
         
-        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) بنجاح!\nرقم المتسابق: `{contestant_id}`", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) رقم `{contestant_id}` بنجاح!", parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ حدث خطأ أثناء النشر: {e}")
 
@@ -282,7 +285,6 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد!", show_alert=True)
 
-# ===== الدالة المعدلة والآمنة لعرض قائمة المصوتين بدون أخطاء =====
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -409,4 +411,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+    
