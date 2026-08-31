@@ -304,24 +304,29 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voters_str = "لا يوجد مصوتين بعد."
     else:
         formatted_voters = []
-        for v in voters:
-            v_name = v.get("name", "مستخدم")
+        for idx, v in enumerate(voters, 1):
+            v_name = str(v.get("name", "مستخدم")).replace("*", "").replace("_", "").replace("`", "")
             v_username = v.get("username")
             v_id = v.get("id")
             
             if v_username:
-                formatted_voters.append(f"• {v_name} ⟵ {v_username}")
+                formatted_voters.append(f"• {idx}. {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• {v_name} ⟵ [آيدي: `{v_id}`]")
+                formatted_voters.append(f"• {idx}. {v_name} ⟵ [آيدي: `{v_id}`]")
                 
         voters_str = "\n".join(formatted_voters)
     
-    await update.message.reply_text(
+    full_msg = (
         f"📊 **المصوتين للمتسابق ({contestant['name']}):**\n"
         f"إجمالي الأصوات: {contestant['votes']}\n\n"
-        f"قائمة حسابات المصوتين:\n{voters_str}",
-        parse_mode="Markdown"
+        f"قائمة حسابات المصوتين:\n{voters_str}"
     )
+
+    if len(full_msg) > 4000:
+        for x in range(0, len(full_msg), 4000):
+            await update.message.reply_text(full_msg[x:x+4000], parse_mode="Markdown")
+    else:
+        await update.message.reply_text(full_msg, parse_mode="Markdown")
 
 async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -400,4 +405,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-                      
+        
