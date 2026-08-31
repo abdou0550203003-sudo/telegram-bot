@@ -6,10 +6,11 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8556834336:8916563533:AAEoPxdqnJzJmMHm6Gvu6T6vx8AcMrw6kZs"
-CHANNEL_USERNAME = "@momomimoo"   # معرف قناتك
-MASTER_ADMIN_ID = 7360406910      # الآيدي الأساسي الخاص بك (المطور الرئيسي)
+BOT_TOKEN = "8916563533:AAEoPxdqnJzJmMHm6Gvu6T6vx8AcMrw6kZs"
+CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
+MASTER_ADMIN_ID = 8209968506         # الآيدي الخاص بك (المطور الرئيسي)
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
+# ==========================================================
 
 DATA_FILE = "contest_data.json"
 
@@ -87,7 +88,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة آيدي الأدمن المراد إضافته.\nمثال: /addadmin 123456789", parse_mode="Markdown")
+        await update.message.reply_text("❌ يرجى كتابة آيدي الأدمن المراد إضافته.\nمثال: `/addadmin 123456789`", parse_mode="Markdown")
         return
 
     try:
@@ -100,7 +101,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if new_admin_id not in data["admins"]:
         data["admins"].append(new_admin_id)
         save_data(data)
-        await update.message.reply_text(f"✅ تم إضافة الآيدي {new_admin_id} كأدمن جديد للبوت بنجاح!", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد للبوت بنجاح!", parse_mode="Markdown")
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
@@ -111,7 +112,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم المتسابق أو يوزره بعد الأمر.\nمثال:\n/add يوسف\n/add @lrdlocas", parse_mode="Markdown")
+        await update.message.reply_text("❌ يرجى كتابة اسم المتسابق أو يوزره بعد الأمر.\nمثال:\n`/add يوسف`\n`/add @lrdlocas`", parse_mode="Markdown")
         return
 
     raw_input = " ".join(context.args)
@@ -148,7 +149,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_data(data)
         
-        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) في القناة بنجاح!\nرقم المتسابق: {contestant_id}", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) في القناة بنجاح!\nرقم المتسابق: `{contestant_id}`", parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ حدث خطأ أثناء النشر في القناة: {e}")
 
@@ -212,7 +213,6 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     if not target_contestant:
         return
 
-    # استخراج اليوزر إن وجد لتسهيل الدخول لحسابه
     username = user.username if user.username else None
     
     voter_entry = {
@@ -221,7 +221,6 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
         "username": f"@{username}" if username else None
     }
 
-    # إذا كان المستخدم أدمن، نزيد صوته مباشرة دون مسح أصوات
     if skip_limits:
         target_contestant["voters"].append(voter_entry)
         target_contestant["votes"] += 1
@@ -234,25 +233,19 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
             await update.message.reply_text(msg, parse_mode="Markdown")
         return
 
-    # لكل مستخدم صوت واحد فقط في المسابقة كلها:
-    # نقوم بالبحث في جميع المتسابقين وحذف أي صوت سابق لهذا المستخدم تماماً
+    # نقل الصوت: حذف التصويت السابق كلياً من أي متسابق آخر
     for c_id, c_data in data["contestants"].items():
         original_voters_count = len(c_data["voters"])
-        # تصفية المصوتين بحيث يتم إزالة هذا المستخدم من أي متسابق آخر أو حتى نفس المتسابق
         c_data["voters"] = [v for v in c_data["voters"] if v.get("id") != user_id]
         
-        # إذا تغير عدد المصوتين في ذلك المتسابق، يعني أننا حذفنا صوته القديم منه، فنقوم بتحديث عداد أصواته
         if len(c_data["voters"]) < original_voters_count:
             c_data["votes"] = max(0, c_data["votes"] - 1)
-            # تحديث منشور ذلك المتسابق القديم في القناة
             await update_channel_post(context.bot, c_id, c_data)
 
-    # إضافة الصوت للمتسابق الجديد المطلوب
     target_contestant["voters"].append(voter_entry)
     target_contestant["votes"] += 1
     save_data(data)
     
-    # تحديث منشور المتسابق الجديد في القناة
     await update_channel_post(context.bot, contestant_id, target_contestant)
 
     msg = f'تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق "{target_contestant["name"]}"'
@@ -282,14 +275,13 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد! اشترك أولاً ثم اضغط مجدداً.", show_alert=True)
 
-# عرض المصوتين مع إرسال اليوزر المباشر أو رابط الحساب ليطابق طلبك تماماً
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         return
         
     if not context.args:
-        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: /voters 1", parse_mode="Markdown")
+        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: `/voters 1`", parse_mode="Markdown")
         return
         
     contestant_id = context.args[0]
@@ -310,16 +302,15 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
             v_username = v.get("username")
             v_id = v.get("id")
             
-            # إذا كان لديه يوزر، نعرضه مع رابط مباشر أو يوزر قابل للضغط، وإذا لم يكن لديه نعرض رابط تليجرام بالآيدي أو اسمه مع الآيدي
             if v_username:
                 formatted_voters.append(f"• {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: {v_id}]")
+                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: `{v_id}`]")
                 
         voters_str = "\n".join(formatted_voters)
     
     await update.message.reply_text(
-        f"📊 المصوتين للمتسابق ({contestant['name']}):\n"
+        f"📊 **المصوتين للمتسابق ({contestant['name']}):**\n"
         f"إجمالي الأصوات: {contestant['votes']}\n\n"
         f"قائمة حسابات المصوتين:\n{voters_str}",
         parse_mode="Markdown"
@@ -331,7 +322,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("❌ الاستخدام: /setvotes <رقم_المتسابق> <عدد_الأصوات>\nمثال: /setvotes 1 50", parse_mode="Markdown")
+        await update.message.reply_text("❌ الاستخدام: `/setvotes <رقم_المتسابق> <عدد_الأصوات>`\nمثال: `/setvotes 1 50`", parse_mode="Markdown")
         return
 
     contestant_id = context.args[0]
@@ -354,7 +345,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
 # --- سيرفر Flask لضمان استمرار عمل Render ---
-app = FlaskName = Flask(name)
+app = Flask(__name__)
 
 @app.route('/')
 def home():
@@ -377,8 +368,9 @@ def main():
     application.add_handler(CommandHandler("addadmin", add_admin))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بالتعديلات النهائية الدقيقة...")
+    print("البوت يعمل الآن بالتعديلات الأخيرة مع بياناتك الجديدة...")
     application.run_polling()
 
-if name == "main":
+if __name__ == "__main__":
     main()
+        
