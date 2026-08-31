@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 # ==================== الإعدادات الأساسية ====================
 BOT_TOKEN = "ضع_التوكن_الجديد_هنا"
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
-MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك
+MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك (تم التحديث)
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
 # ==========================================================
 
@@ -21,6 +21,8 @@ def load_data():
                 data = json.load(f)
                 if "admins" not in data:
                     data["admins"] = [MASTER_ADMIN_ID]
+                elif MASTER_ADMIN_ID not in data["admins"]:
+                    data["admins"].append(MASTER_ADMIN_ID)
                 if "contestants" not in data:
                     data["contestants"] = {}
                 return data
@@ -102,7 +104,6 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["admins"].append(new_admin_id)
         save_data(data)
         
-        # إضافة قائمة الأوامر الإدارية للأدمن الجديد تلقائياً
         admin_commands = [
             BotCommand("start", "بدء التشغيل"),
             BotCommand("add", "إضافة متسابق جديد"),
@@ -240,7 +241,6 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
             await update.message.reply_text(msg, parse_mode="Markdown")
         return
 
-    # سحب الصوت القديم من أي متسابق آخر
     for c_id, c_data in data["contestants"].items():
         original_voters_count = len(c_data["voters"])
         c_data["voters"] = [v for v in c_data["voters"] if v.get("id") != user_id]
@@ -312,7 +312,7 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if v_username:
                 formatted_voters.append(f"• {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: `{v_id}`]")
+                formatted_voters.append(f"• {v_name} ⟵ [آيدي: `{v_id}`]")
                 
         voters_str = "\n".join(formatted_voters)
     
@@ -364,13 +364,11 @@ def run_flask():
 
 # إعداد القوائم المخصصة حسب الصلاحية عند إقلاع البوت
 async def setup_bot_commands(app):
-    # 1. قائمة المستخدمين العاديين
     user_commands = [
         BotCommand("start", "بدء تشغيل البوت والتصويت")
     ]
     await app.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
 
-    # 2. قائمة الأدمن الرئيسي
     admin_commands = [
         BotCommand("start", "بدء تشغيل البوت"),
         BotCommand("add", "إضافة متسابق جديد للقناة"),
@@ -397,9 +395,9 @@ def main():
     application.add_handler(CommandHandler("addadmin", add_admin))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بالقوائم المخصصة...")
+    print("البوت يعمل الآن بالقوائم المخصصة للآيدي الخاص بك...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
-        
+                      
