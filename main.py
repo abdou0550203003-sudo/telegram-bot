@@ -6,11 +6,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8556834336:AAG8dBUKD4R8O_U4GCNeZYqJRaLKsu40nys"
+BOT_TOKEN = "8556834336:8916563533:AAEoPxdqnJzJmMHm6Gvu6T6vx8AcMrw6kZs"
 CHANNEL_USERNAME = "@momomimoo"   # معرف قناتك
 MASTER_ADMIN_ID = 7360406910      # الآيدي الأساسي الخاص بك (المطور الرئيسي)
-BOT_USERNAME = "Dhhdhdhffdhd_bot" # معرف بوتك بدون علامة @
-# ==========================================================
+BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
 
 DATA_FILE = "contest_data.json"
 
@@ -88,7 +87,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة آيدي الأدمن المراد إضافته.\nمثال: `/addadmin 123456789`", parse_mode="Markdown")
+        await update.message.reply_text("❌ يرجى كتابة آيدي الأدمن المراد إضافته.\nمثال: /addadmin 123456789", parse_mode="Markdown")
         return
 
     try:
@@ -101,7 +100,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if new_admin_id not in data["admins"]:
         data["admins"].append(new_admin_id)
         save_data(data)
-        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد للبوت بنجاح!", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم إضافة الآيدي {new_admin_id} كأدمن جديد للبوت بنجاح!", parse_mode="Markdown")
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
@@ -112,7 +111,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم المتسابق أو يوزره بعد الأمر.\nمثال:\n`/add يوسف`\n`/add @lrdlocas`", parse_mode="Markdown")
+        await update.message.reply_text("❌ يرجى كتابة اسم المتسابق أو يوزره بعد الأمر.\nمثال:\n/add يوسف\n/add @lrdlocas", parse_mode="Markdown")
         return
 
     raw_input = " ".join(context.args)
@@ -149,7 +148,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_data(data)
         
-        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) في القناة بنجاح!\nرقم المتسابق: `{contestant_id}`", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم نشر المتسابق ({display_name}) في القناة بنجاح!\nرقم المتسابق: {contestant_id}", parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ حدث خطأ أثناء النشر في القناة: {e}")
 
@@ -290,7 +289,7 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     if not context.args:
-        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: `/voters 1`", parse_mode="Markdown")
+        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: /voters 1", parse_mode="Markdown")
         return
         
     contestant_id = context.args[0]
@@ -315,12 +314,12 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if v_username:
                 formatted_voters.append(f"• {v_name} ⟵ {v_username}")
             else:
-                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: `{v_id}`]")
+                formatted_voters.append(f"• {v_name} ⟵ (تليجرام: tg://user?id={v_id}) [آيدي: {v_id}]")
                 
         voters_str = "\n".join(formatted_voters)
     
     await update.message.reply_text(
-        f"📊 **المصوتين للمتسابق ({contestant['name']}):**\n"
+        f"📊 المصوتين للمتسابق ({contestant['name']}):\n"
         f"إجمالي الأصوات: {contestant['votes']}\n\n"
         f"قائمة حسابات المصوتين:\n{voters_str}",
         parse_mode="Markdown"
@@ -332,7 +331,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("❌ الاستخدام: `/setvotes <رقم_المتسابق> <عدد_الأصوات>`\nمثال: `/setvotes 1 50`", parse_mode="Markdown")
+        await update.message.reply_text("❌ الاستخدام: /setvotes <رقم_المتسابق> <عدد_الأصوات>\nمثال: /setvotes 1 50", parse_mode="Markdown")
         return
 
     contestant_id = context.args[0]
@@ -355,7 +354,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
 # --- سيرفر Flask لضمان استمرار عمل Render ---
-app = FlaskName = Flask(__name__)
+app = FlaskName = Flask(name)
 
 @app.route('/')
 def home():
@@ -381,6 +380,5 @@ def main():
     print("البوت يعمل الآن بالتعديلات النهائية الدقيقة...")
     application.run_polling()
 
-if __name__ == "__main__":
+if name == "main":
     main()
-                         
