@@ -70,7 +70,78 @@ async def update_channel_post(bot, contestant_id, contestant_data):
     except Exception as e:
         print(f"خطأ في تحديث منشور القناة: {e}")
 
-# ==================== الأوامر الإدارية ====================
+# ==================== لوحة التحكم والأوامر الإدارية ====================
+
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("⛔ هذه اللوحة مخصصة للإدارة فقط!")
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("📊 إحصائيات المسابقة", callback_data="admin_stats")],
+        [InlineKeyboardButton("➕ إضافة متسابق", callback_data="admin_add_help"), InlineKeyboardButton("🔄 تصفير المسابقة", callback_data="admin_new_contest")],
+        [InlineKeyboardButton("🔍 طريقة كشف المصوتين", callback_data="admin_voters_help"), InlineKeyboardButton("✏️ طريقة تعديل الأصوات", callback_data="admin_setvotes_help")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    msg = "⚙️ **لوحة التحكم الإدارية**\nاختر من الأزرار أدناه للتحكم بالمسابقة والبوت:"
+    
+    if update.callback_query:
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode="Markdown")
+
+async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    if not is_admin(user_id):
+        await query.answer("⛔ غير مصرح لك!", show_alert=True)
+        return
+
+    data_action = query.data
+
+    if data_action == "admin_stats":
+        data = load_data()
+        contestants = data.get("contestants", {})
+        total_votes = sum(c.get("votes", 0) for c in contestants.values())
+        sorted_c = sorted(contestants.items(), key=lambda x: x[1].get("votes", 0), reverse=True)
+        
+        report = f"📊 **إحصائيات المسابقة الحالية:**\n\n"
+        report += f"👤 عدد المتسابقين: `{len(contestants)}`\n"
+        report += f"🗳️ إجمالي الأصوات: `{total_votes}`\n"
+        if sorted_c:
+            leader = sorted_c[0][1]
+            report += f"🏆 المتصدر: **{leader.get('name')}** بـ `{leader.get('votes')}` صوت\n"
+
+        keyboard = [[InlineKeyboardButton("🔙 العودة للوحة التحكم", callback_data="admin_back")]]
+        await query.edit_message_text(report, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data_action == "admin_add_help":
+        msg = "➕ **طريقة إضافة متسابق:**\nأرسل الأمر التالي في الشات:\n`/add <اسم_المتسابق>`\n\nمثال:\n`/add أحمد`"
+        keyboard = [[InlineKeyboardButton("🔙 العودة للوحة التحكم", callback_data="admin_back")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data_action == "admin_new_contest":
+        data = load_data()
+        data["contestants"] = {}
+        save_data(data)
+        await query.answer("🔄 تم تصفير المسابقة!", show_alert=True)
+        await admin_panel(update, context)
+
+    elif data_action == "admin_voters_help":
+        msg = "🔍 **طريقة كشف المصوتين:**\nأرسل الأمر التالي متبوعاً برقم المتسابق:\n`/voters <رقم_المتسابق>`\n\nمثال:\n`/voters 1`"
+        keyboard = [[InlineKeyboardButton("🔙 العودة للوحة التحكم", callback_data="admin_back")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data_action == "admin_setvotes_help":
+        msg = "✏️ **تعديل الأصوات:**\nأرسل الأمر متبوعاً برقم المتسابق وعدد الأصوات الجديدة:\n`/setvotes <رقم_المتسابق> <الأصوات>`\n\nمثال:\n`/setvotes 1 50`"
+        keyboard = [[InlineKeyboardButton("🔙 العودة للوحة التحكم", callback_data="admin_back")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data_action == "admin_back":
+        await admin_panel(update, context)
 
 async def new_contest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -106,8 +177,9 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         admin_commands = [
             BotCommand("start", "بدء التشغيل"),
+            BotCommand("admin", "فتح لوحة التحكم الإدارية"),
             BotCommand("add", "إضافة متسابق جديد"),
-            BotCommand("voters", "عرض المصوتين"),
+            BotCommand("voters", "عرض المصوتين لمتسابق"),
             BotCommand("setvotes", "تعديل الأصوات"),
             BotCommand("newcontest", "تصفير المسابقة")
         ]
@@ -116,11 +188,10 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد وتفعيل قائمته الخاصة!", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ تم إضافة الآيدي `{new_admin_id}` كأدمن جديد وتفعيل لوحة التحكم له!", parse_mode="Markdown")
     else:
         await update.message.reply_text("⚠️ هذا المستخدم مسجل كأدمن مسبقاً.")
 
-# ===== دالة إضافة المتسابقين المعدلة لتشمل الرقم بالتتابع =====
 async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -131,13 +202,10 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ اكتب اسم المتسابق بعد الأمر.\nمثال: `/add يوسف`", parse_mode="Markdown")
         return
 
-    raw_input = " ".join(context.args)
-    display_name = raw_input
-
+    display_name = " ".join(context.args)
     data = load_data()
     contestant_id = str(len(data["contestants"]) + 1)
     
-    # تنسيق اسم المنشور بالنظام التسلسلي (مثال: 👤 المتسابق (1): علي)
     contestant_text = f"👤 المتسابق ({contestant_id}): {display_name}"
     
     clean_bot = BOT_USERNAME.replace("@", "")
@@ -165,7 +233,7 @@ async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ حدث خطأ أثناء النشر: {e}")
 
-# ==================== نظام التصويت ====================
+# ==================== نظام التصويت والاستعلام العام ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -176,8 +244,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        f"مرحباً بك {user.first_name} في بوت المسابقات! 🏆\n"
-        "اضغط على زر التصويت الموجود أسفل متسابقك المفضل في القناة للمشاركة."
+        f"مرحباً بك {user.first_name} في بوت المسابقات! 🏆\n\n"
+        "• للتصويت: اضغط على زر التصويت الموجود أسفل منشور المتسابق في القناة.\n"
+        "• لمعرفة من صوت لمتسابق معّين: أرسل الأمر `/voters` متبوعاً برقم المتسابق (مثال: `/voters 1`)."
     )
 
 async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contestant_id: str):
@@ -285,13 +354,10 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد!", show_alert=True)
 
+# ===== إتاحة رؤية المصوتين للجميع بناءً على طلبك =====
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        return
-        
     if not context.args:
-        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين.\nمثال: /voters 1")
+        await update.message.reply_text("❌ اكتب رقم المتسابق لمعرفة المصوتين له.\nمثال: `/voters 1`", parse_mode="Markdown")
         return
         
     contestant_id = context.args[0]
@@ -304,25 +370,24 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     voters = contestant.get("voters", [])
     if not voters:
-        voters_str = "لا يوجد مصوتين بعد."
+        voters_str = "لا يوجد مصوتين لهذا المتسابق بعد."
     else:
         formatted_voters = []
         for idx, v in enumerate(voters, 1):
-            v_name = v.get("name") if v.get("name") else "مستخدم بدون اسم"
+            v_name = v.get("name") if v.get("name") else "مستخدم"
             v_username = v.get("username")
-            v_id = v.get("id", "غير معروف")
             
             if v_username:
-                formatted_voters.append(f"• {idx}. {v_name} ⟵ {v_username}")
+                formatted_voters.append(f"• {idx}. {v_name} ({v_username})")
             else:
-                formatted_voters.append(f"• {idx}. {v_name} ⟵ (بدون يوزر - ID: {v_id})")
+                formatted_voters.append(f"• {idx}. {v_name} (بدون يوزر)")
                 
         voters_str = "\n".join(formatted_voters)
     
     full_msg = (
-        f"📊 المصوتين للمتسابق ({contestant.get('name', '')}):\n"
+        f"📊 قائمة المصوتين للمتسابق ({contestant.get('name', '')}):\n"
         f"إجمالي الأصوات: {contestant.get('votes', 0)}\n\n"
-        f"قائمة حسابات المصوتين:\n{voters_str}"
+        f"{voters_str}"
     )
 
     try:
@@ -373,15 +438,17 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# إعداد القوائم المخصصة حسب الصلاحية عند إقلاع البوت
+# إعداد القوائم المخصصة عند الإقلاع
 async def setup_bot_commands(app):
     user_commands = [
-        BotCommand("start", "بدء تشغيل البوت والتصويت")
+        BotCommand("start", "بدء تشغيل البوت والتصويت"),
+        BotCommand("voters", "عرض المصوتين لمتسابق")
     ]
     await app.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
 
     admin_commands = [
         BotCommand("start", "بدء تشغيل البوت"),
+        BotCommand("admin", "فتح لوحة التحكم الإدارية"),
         BotCommand("add", "إضافة متسابق جديد للقناة"),
         BotCommand("voters", "عرض قائمة المصوتين لمتسابق"),
         BotCommand("setvotes", "تعديل عدد أصوات متسابق"),
@@ -399,16 +466,19 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(setup_bot_commands).build()
 
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("add", add_contestant))
     application.add_handler(CommandHandler("voters", view_voters))
     application.add_handler(CommandHandler("setvotes", set_votes))
     application.add_handler(CommandHandler("newcontest", new_contest))
     application.add_handler(CommandHandler("addadmin", add_admin))
+    
+    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بالقوائم المخصصة للآيدي الخاص بك...")
+    print("البوت يعمل الآن مجهزاً بلواحة التحكم الجديدة...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
-    
+        
