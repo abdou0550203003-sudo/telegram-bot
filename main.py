@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8916563533:AAEoPxdqnJzJmMHm6Gvu6T6vx8AcMrw6kZs"
+BOT_TOKEN = "8916563533:AAGIJUuDHdx9cQuWbc4eq0-BJEclMaKiXeA"
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
 MASTER_ADMIN_ID = 8209968506         # الآيدي الخاص بك (المطور الرئيسي)
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون علامة @
