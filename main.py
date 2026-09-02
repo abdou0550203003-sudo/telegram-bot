@@ -1,4 +1,3 @@
-
 import os
 import json
 import threading
@@ -7,7 +6,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-BOT_TOKEN = "8916563533:AAGIJUuDHdx9cQuWbc4eq0-BJEclMaKiXeA"
+# يقرأ التوكن من متغيرات البيئة بأمان، أو يستخدم التوكن الجديد تلقائياً
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8916563533:AAHFIYibwWWg3yM0_9aLxCA_EJ3cwL2HX4g")
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
 MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك
 BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون @
@@ -82,7 +82,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_vote(update, context, contestant_id)
         return
 
-    # تم إزالة زر كشف المصوتين للمستخدمين العاديين من القائمة
     keyboard = [
         [InlineKeyboardButton("🏆 قائمة المتسابقين 👥", callback_data="btn_contestants")],
         [InlineKeyboardButton("📢 قناة المسابقة 🔗", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
@@ -352,7 +351,6 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 # ===== حصري للإدارة فقط: كشف المصوتين =====
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # التحقق من أن المستخدم آدمن قبل تنفيذ الأمر
     if not is_admin(user_id):
         await update.message.reply_text("⛔ هذا الأمر مخصص للأدمن فقط!")
         return
@@ -437,7 +435,7 @@ def home():
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 # إعداد قوائم البوت المقترحة (الافتراضية للجميع وحصرية للأدمن)
 async def setup_bot_commands(app):
@@ -473,9 +471,9 @@ def main():
     application.add_handler(CallbackQueryHandler(button_click_handler, pattern="^btn_"))
     application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
 
-    print("البوت يعمل الآن بالنظام والشكل الجديد...")
+    print("البوت يعمل الآن بالتوكن الجديد والنظام المحدث...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
-                
+    
