@@ -1,6 +1,6 @@
 import os
 import json
-import threading
+import asyncio
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -461,36 +461,28 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
-# --- سيرفر Flask ---
+# --- سيرفر Flask وإدارة البوت ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running live 24/7!"
+    return "Bot is running live 24/7!", 200
 
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+async def main():
+    # إنشاء وتعديل التطبيق
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-async def setup_bot_commands(app):
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CommandHandler("add", add_contestant))
+    application.add_handler(CommandHandler("addadmin", add_admin))
+    application.add_handler(CommandHandler("voters", view_voters))
+    application.add_handler(CommandHandler("setvotes", set_votes))
+
+    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
+    application.add_handler(CallbackQueryHandler(button_click_handler, pattern="^btn_"))
+    application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
+
+    # إعداد أوامر الأزرار
     user_commands = [BotCommand("start", "فتح القائمة الرئيسية")]
-    await app.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
-
-    admin_commands = [
-        BotCommand("start", "فتح القائمة الرئيسية"),
-        BotCommand("admin", "فتح لوحة التحكم الإدارية"),
-        BotCommand("add", "إضافة متسابق جديد"),
-        BotCommand("addadmin", "إضافة أدمن جديد"),
-        BotCommand("voters", "عرض المصوتين لمتسابق"),
-        BotCommand("setvotes", "تعديل الأصوات")
-    ]
-    
-    data = load_data()
-    for admin_id in data.get("admins", [MASTER_ADMIN_ID]):
-        try:
-            await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
-        except Exception as e:
-            print(f"Error setting admin command: {e}")
-
-def main():
-    threading.Threa
+    await application.bot.set_my_commands(user_commands, scope=BotCommandScopeDefa
