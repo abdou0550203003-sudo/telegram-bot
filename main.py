@@ -6,7 +6,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ==================== الإعدادات الأساسية ====================
-# يقرأ التوكن من متغيرات البيئة بأمان، أو يستخدم التوكن الجديد تلقائياً
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8916563533:AAHFIYibwWWg3yM0_9aLxCA_EJ3cwL2HX4g")
 CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
 MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك
@@ -149,8 +148,9 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📊 إحصائيات المسابقة", callback_data="admin_stats")],
-        [InlineKeyboardButton("➕ إضافة متسابق", callback_data="admin_add_help"), InlineKeyboardButton("🔄 تصفير المسابقة", callback_data="admin_new_contest")],
-        [InlineKeyboardButton("🔍 طريقة كشف المصوتين", callback_data="admin_voters_help"), InlineKeyboardButton("✏️ تعديل الأصوات", callback_data="admin_setvotes_help")],
+        [InlineKeyboardButton("➕ إضافة متسابق", callback_data="admin_add_help"), InlineKeyboardButton("👑 إضافة أدمن", callback_data="admin_addadmin_help")],
+        [InlineKeyboardButton("🔄 تصفير المسابقة", callback_data="admin_new_contest"), InlineKeyboardButton("✏️ تعديل الأصوات", callback_data="admin_setvotes_help")],
+        [InlineKeyboardButton("🔍 طريقة كشف المصوتين", callback_data="admin_voters_help")],
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="btn_main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -175,12 +175,22 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
     if data_action == "admin_stats":
         data = load_data()
         contestants = data.get("contestants", {})
+        admins = data.get("admins", [])
         total_votes = sum(c.get("votes", 0) for c in contestants.values())
-        report = f"📊 **إحصائيات الإدارة:**\n\n👤 عدد المتسابقين: `{len(contestants)}`\n🗳️ إجمالي الأصوات: `{total_votes}`\n"
+        report = (
+            f"📊 **إحصائيات الإدارة:**\n\n"
+            f"👤 عدد المتسابقين: `{len(contestants)}`\n"
+            f"👑 عدد الأدمنية: `{len(admins)}`\n"
+            f"🗳️ إجمالي الأصوات: `{total_votes}`\n"
+        )
         await query.edit_message_text(report, reply_markup=back_btn, parse_mode="Markdown")
 
     elif data_action == "admin_add_help":
         msg = "➕ **إضافة متسابق:**\nأرسل الأمر المباشر:\n`/add <اسم_المتسابق>`\nمثال: `/add يوسف`"
+        await query.edit_message_text(msg, reply_markup=back_btn, parse_mode="Markdown")
+
+    elif data_action == "admin_addadmin_help":
+        msg = "👑 **إضافة أدمن جديد:**\nأرسل الأمر المباشر متضمناً آيدي المشرف:\n`/addadmin <آيدي_المشرف>`\nمثال: `/addadmin 123456789`"
         await query.edit_message_text(msg, reply_markup=back_btn, parse_mode="Markdown")
 
     elif data_action == "admin_new_contest":
@@ -202,6 +212,46 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         await admin_panel(update, context)
 
 # ==================== الأوامر والتصويت ====================
+
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("⛔ هذا الأمر مخصص للأدمن فقط!")
+        return
+
+    if not context.args:
+        await update.message.reply_text("❌ الاستخدام الصحيح:\n`/addadmin <آيدي_المستخدم>`\nمثال: `/addadmin 123456789`", parse_mode="Markdown")
+        return
+
+    try:
+        new_admin_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ الآيدي يجب أن يكون رقماً فقط!")
+        return
+
+    data = load_data()
+    if new_admin_id in data["admins"]:
+        await update.message.reply_text("⚠️ هذا المستخدم أدمن بالفعل في البوت!")
+        return
+
+    data["admins"].append(new_admin_id)
+    save_data(data)
+
+    # تحديث الأوامر للمشرف الجديد
+    try:
+        admin_commands = [
+            BotCommand("start", "فتح القائمة الرئيسية"),
+            BotCommand("admin", "فتح لوحة التحكم الإدارية"),
+            BotCommand("add", "إضافة متسابق جديد"),
+            BotCommand("addadmin", "إضافة أدمن جديد"),
+            BotCommand("voters", "عرض المصوتين لمتسابق (حصري)"),
+            BotCommand("setvotes", "تعديل الأصوات")
+        ]
+        await context.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=new_admin_id))
+    except Exception as e:
+        print(f"تنبيه تحديث أوامر الأدمن الجديد: {e}")
+
+    await update.message.reply_text(f"✅ تم إضافة المستخدم `{new_admin_id}` كـ أدمن بنجاح!", parse_mode="Markdown")
 
 async def add_contestant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -437,7 +487,7 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# إعداد قوائم البوت المقترحة (الافتراضية للجميع وحصرية للأدمن)
+# إعداد قوائم البوت المقترحة
 async def setup_bot_commands(app):
     user_commands = [
         BotCommand("start", "فتح القائمة الرئيسية")
@@ -448,32 +498,5 @@ async def setup_bot_commands(app):
         BotCommand("start", "فتح القائمة الرئيسية"),
         BotCommand("admin", "فتح لوحة التحكم الإدارية"),
         BotCommand("add", "إضافة متسابق جديد"),
-        BotCommand("voters", "عرض المصوتين لمتسابق (حصري)"),
-        BotCommand("setvotes", "تعديل الأصوات")
-    ]
-    try:
-        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=MASTER_ADMIN_ID))
-    except Exception as e:
-        print(f"تنبيه ضبط قائمة الأدمن: {e}")
-
-def main():
-    threading.Thread(target=run_flask, daemon=True).start()
-
-    application = ApplicationBuilder().token(BOT_TOKEN).post_init(setup_bot_commands).build()
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("admin", admin_panel))
-    application.add_handler(CommandHandler("add", add_contestant))
-    application.add_handler(CommandHandler("voters", view_voters))
-    application.add_handler(CommandHandler("setvotes", set_votes))
-
-    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
-    application.add_handler(CallbackQueryHandler(button_click_handler, pattern="^btn_"))
-    application.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_vote_"))
-
-    print("البوت يعمل الآن بالتوكن الجديد والنظام المحدث...")
-    application.run_polling()
-
-if __name__ == "__main__":
-    main()
-    
+        BotCommand("addadmin", "إضافة أدمن جديد"),
+        BotCom
