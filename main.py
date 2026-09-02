@@ -1,3 +1,4 @@
+
 import os
 import json
 import threading
@@ -349,7 +350,7 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
         target_contestant["votes"] += 1
         save_data(data)
         await update_channel_post(context.bot, contestant_id, target_contestant)
-        msg = f'⚡ [أدمن] تم احتساب صوتك بنجاح للمتسابق "{target_contestant["name"]}"!'
+        msg = f"⚡ [أدمن] تم احتساب صوتك بنجاح للمتسابق \"{target_contestant['name']}\"!"
         if is_callback:
             await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
         else:
@@ -370,7 +371,7 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     
     await update_channel_post(context.bot, contestant_id, target_contestant)
 
-    msg = f'تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق "{target_contestant["name"]}"'
+    msg = f"تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق \"{target_contestant['name']}\""
     
     if is_callback:
         await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
@@ -498,4 +499,4 @@ async def setup_bot_commands(app):
         BotCommand("admin", "فتح لوحة التحكم الإدارية"),
         BotCommand("add", "إضافة متسابق جديد"),
         BotCommand("addadmin", "إضافة أدمن جديد"),
-        BotCommand("voters", "عرض المصوتين لمتسا
+        BotCommand("voters", "عرض المصوتين ل
