@@ -237,7 +237,6 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["admins"].append(new_admin_id)
     save_data(data)
 
-    # تحديث الأوامر للمشرف الجديد
     try:
         admin_commands = [
             BotCommand("start", "فتح القائمة الرئيسية"),
@@ -499,4 +498,4 @@ async def setup_bot_commands(app):
         BotCommand("admin", "فتح لوحة التحكم الإدارية"),
         BotCommand("add", "إضافة متسابق جديد"),
         BotCommand("addadmin", "إضافة أدمن جديد"),
-        BotCom
+        BotCommand("voters", "عرض المصوتين لمتسا
