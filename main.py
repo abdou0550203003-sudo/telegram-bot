@@ -1,4 +1,3 @@
-
 import os
 import json
 import threading
@@ -8,9 +7,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 # ==================== الإعدادات الأساسية ====================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8916563533:AAHFIYibwWWg3yM0_9aLxCA_EJ3cwL2HX4g")
-CHANNEL_USERNAME = "@kmaaaaaaaaldd"  # معرف قناتك
-MASTER_ADMIN_ID = 7360406910         # الآيدي الخاص بك
-BOT_USERNAME = "competitions_lucas_bot" # معرف بوتك بدون @
+CHANNEL_USERNAME = "@kmaaaaaaaaldd"
+MASTER_ADMIN_ID = 7360406910
+BOT_USERNAME = "competitions_lucas_bot"
 # ==========================================================
 
 DATA_FILE = "contest_data.json"
@@ -36,7 +35,7 @@ def save_data(data):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"خطأ في حفظ البيانات: {e}")
+        print(f"Error saving data: {e}")
 
 def is_admin(user_id):
     data = load_data()
@@ -47,7 +46,7 @@ async def is_user_subscribed(bot, user_id):
         member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
         return member.status in ['creator', 'administrator', 'member']
     except Exception as e:
-        print(f"خطأ في التحقق من الاشتراك: {e}")
+        print(f"Error checking sub: {e}")
         return False
 
 async def update_channel_post(bot, contestant_id, contestant_data):
@@ -69,9 +68,9 @@ async def update_channel_post(bot, contestant_id, contestant_data):
             reply_markup=reply_markup
         )
     except Exception as e:
-        print(f"خطأ في تحديث منشور القناة: {e}")
+        print(f"Error updating post: {e}")
 
-# ==================== الواجهة الرئيسية والأزرار الشفافة ====================
+# ==================== الواجهة الرئيسية ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -92,10 +91,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.insert(2, [InlineKeyboardButton("⚙️ لوحة تحكم الأدمن 🛠️", callback_data="btn_admin")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    msg_text = (
-        f"أهلاً بك **{user.first_name}** في بوت المسابقات الرسمي! 👋\n\n"
-        "إليك القائمة الرئيسية، اختر منها الخدمات والأوامر التي تريدها:"
-    )
+    msg_text = f"أهلاً بك **{user.first_name}** في بوت المسابقات الرسمي! 👋\n\nإليك القائمة الرئيسية، اختر منها ما تريد:"
     
     if update.callback_query:
         await update.callback_query.edit_message_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
@@ -140,7 +136,7 @@ async def button_click_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     elif data_key == "btn_main_menu":
         await start(update, context)
 
-# ==================== لوحة تحكم الإدارة ====================
+# ==================== لوحة التحكم ====================
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -178,12 +174,7 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         contestants = data.get("contestants", {})
         admins = data.get("admins", [])
         total_votes = sum(c.get("votes", 0) for c in contestants.values())
-        report = (
-            f"📊 **إحصائيات الإدارة:**\n\n"
-            f"👤 عدد المتسابقين: `{len(contestants)}`\n"
-            f"👑 عدد الأدمنية: `{len(admins)}`\n"
-            f"🗳️ إجمالي الأصوات: `{total_votes}`\n"
-        )
+        report = f"📊 **إحصائيات الإدارة:**\n\n👤 عدد المتسابقين: `{len(contestants)}`\n👑 عدد الأدمنية: `{len(admins)}`\n🗳️ إجمالي الأصوات: `{total_votes}`\n"
         await query.edit_message_text(report, reply_markup=back_btn, parse_mode="Markdown")
 
     elif data_action == "admin_add_help":
@@ -202,7 +193,7 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         await admin_panel(update, context)
 
     elif data_action == "admin_voters_help":
-        msg = "🔍 **كشف المصوتين (للأدمن فقط):**\nأرسل الأمر المباشر:\n`/voters <رقم_المتسابق>`\nمثال: `/voters 1`"
+        msg = "🔍 **كشف المصوتين:**\nأرسل الأمر المباشر:\n`/voters <رقم_المتسابق>`\nمثال: `/voters 1`"
         await query.edit_message_text(msg, reply_markup=back_btn, parse_mode="Markdown")
 
     elif data_action == "admin_setvotes_help":
@@ -212,7 +203,7 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
     elif data_action == "admin_back":
         await admin_panel(update, context)
 
-# ==================== الأوامر والتصويت ====================
+# ==================== التصويت والأوامر ====================
 
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -244,12 +235,12 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             BotCommand("admin", "فتح لوحة التحكم الإدارية"),
             BotCommand("add", "إضافة متسابق جديد"),
             BotCommand("addadmin", "إضافة أدمن جديد"),
-            BotCommand("voters", "عرض المصوتين لمتسابق (حصري)"),
+            BotCommand("voters", "عرض المصوتين لمتسابق"),
             BotCommand("setvotes", "تعديل الأصوات")
         ]
         await context.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=new_admin_id))
     except Exception as e:
-        print(f"تنبيه تحديث أوامر الأدمن الجديد: {e}")
+        print(f"Error setting commands: {e}")
 
     await update.message.reply_text(f"✅ تم إضافة المستخدم `{new_admin_id}` كـ أدمن بنجاح!", parse_mode="Markdown")
 
@@ -318,12 +309,7 @@ async def process_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, conte
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        msg = (
-            f"مرحباً بك {user.first_name}! 👋\n\n"
-            f"يجب عليك الاشتراك في قناتنا أولاً ليتم احتساب صوتك للمتسابق {contestant['name']}:\n"
-            f"👉 {CHANNEL_USERNAME}\n\n"
-            f"اشترك في القناة ثم اضغط على زر 'تحقق من الاشتراك' بالأسفل 👇"
-        )
+        msg = f"مرحباً بك {user.first_name}! 👋\n\nيجب عليك الاشتراك في قناتنا أولاً ليتم احتساب صوتك للمتسابق {contestant['name']}:\n👉 {CHANNEL_USERNAME}\n\nاشترك في القناة ثم اضغط على زر 'تحقق من الاشتراك' بالأسفل 👇"
         await update.message.reply_text(msg, reply_markup=reply_markup)
         return
 
@@ -350,7 +336,8 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
         target_contestant["votes"] += 1
         save_data(data)
         await update_channel_post(context.bot, contestant_id, target_contestant)
-        msg = f"⚡ [أدمن] تم احتساب صوتك بنجاح للمتسابق \"{target_contestant['name']}\"!"
+        c_name = target_contestant["name"]
+        msg = f"⚡ [أدمن] تم احتساب صوتك بنجاح للمتسابق {c_name}!"
         if is_callback:
             await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
         else:
@@ -371,7 +358,8 @@ async def apply_vote(update: Update, context: ContextTypes.DEFAULT_TYPE, contest
     
     await update_channel_post(context.bot, contestant_id, target_contestant)
 
-    msg = f"تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق \"{target_contestant['name']}\""
+    c_name = target_contestant["name"]
+    msg = f"تم التحقق من الاشتراك وتم احتساب التصويت بنجاح للمتسابق {c_name}"
     
     if is_callback:
         await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
@@ -398,7 +386,6 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد!", show_alert=True)
 
-# ===== حصري للإدارة فقط: كشف المصوتين =====
 async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
@@ -433,11 +420,9 @@ async def view_voters(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
         voters_str = "\n".join(formatted_voters)
     
-    full_msg = (
-        f"📊 قائمة المصوتين للمتسابق ({contestant.get('name', '')}):\n"
-        f"إجمالي الأصوات: {contestant.get('votes', 0)}\n\n"
-        f"{voters_str}"
-    )
+    c_name = contestant.get("name", "")
+    c_votes = contestant.get("votes", 0)
+    full_msg = f"📊 قائمة المصوتين للمتسابق ({c_name}):\nإجمالي الأصوات: {c_votes}\n\n{voters_str}"
 
     try:
         if len(full_msg) > 4000:
@@ -476,7 +461,7 @@ async def set_votes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ تم تعديل أصوات {contestant['name']} إلى {new_votes} وتحديث القناة!")
 
-# --- سيرفر Flask لاستمرار التشغيل ---
+# --- سيرفر Flask ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -487,11 +472,8 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# إعداد قوائم البوت المقترحة
 async def setup_bot_commands(app):
-    user_commands = [
-        BotCommand("start", "فتح القائمة الرئيسية")
-    ]
+    user_commands = [BotCommand("start", "فتح القائمة الرئيسية")]
     await app.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
 
     admin_commands = [
@@ -499,4 +481,16 @@ async def setup_bot_commands(app):
         BotCommand("admin", "فتح لوحة التحكم الإدارية"),
         BotCommand("add", "إضافة متسابق جديد"),
         BotCommand("addadmin", "إضافة أدمن جديد"),
-        BotCommand("voters", "عرض المصوتين ل
+        BotCommand("voters", "عرض المصوتين لمتسابق"),
+        BotCommand("setvotes", "تعديل الأصوات")
+    ]
+    
+    data = load_data()
+    for admin_id in data.get("admins", [MASTER_ADMIN_ID]):
+        try:
+            await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception as e:
+            print(f"Error setting admin command: {e}")
+
+def main():
+    threading.Threa
